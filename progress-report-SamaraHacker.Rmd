@@ -1,0 +1,149 @@
+---
+title: "Progress Report"
+author: "Samara Feldhacker"
+date: "2026-4-29"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+# Progress Report: Samara Feldhacker
+
+## Scrape the data
+
+I followed the steps outlined within the lab slides and the lecture slides for the lecture covering data scraping. I also utilized these functions for my data set within the Final project, so I am very familiar with them.
+
+```{r}
+library(rvest)
+url <- "https://www.baseball-reference.com/awards/hof_2026.shtml"
+html <- read_html(url)
+tables <- html_table(html)
+
+data <- tables[[1]]
+actual_col_names <- data[1,]
+colnames(data) <- actual_col_names
+data <- data[-1,]
+
+```
+
+Data now contains the data from the hof_2026 webpage.
+
+## Clean the data
+
+What steps are necessary to get the scraped data into a useful format?
+
+### Question 1: 
+
+Within scrapping the data step, I did already get the correct table that contains the necessary information from the webpage, which is the first step to getting the data into a useful format. The first table was the baseball writers table, which was for the 2026 Hall of Fame Voting, and the second table was the veterans committee, which is not needed. Therefore the first table is the needed one.
+
+```{r}
+# Code from above that applies to this step
+
+# data <- tables[[1]]
+```
+
+### Question 2: 
+
+I also completed this step within scrapping the data step. Within the table, the first row already contains the correct column names for the column. Therefore, I set the actual_col_names to be this first row of names, and then I updated the data column names to match these and update the dataset to exclude the first column row. This ensures that the variable names for the columns is incorrect.
+
+```{r}
+# Code from above that applies to this step
+
+# actual_col_names <- data[1,]
+# colnames(data) <- actual_col_names
+# data <- data[-1,]
+```
+
+### Question 3: 
+
+Now, when determining which columns I want to keep, I will compare to the actual HallOfFame dataset
+
+```{r}
+library(Lahman)
+head(HallOfFame, 3)
+```
+
+As shown above, the variables within the HallOfFame dataset are playerID, yearID, votedBy, ballots, needed, votes, induced, category, and needed_note.
+
+Now within the data, the variables that are the most similar / match, are Name (similar ish to playerID) and Votes (votes)
+yearID (2026), ballots (425), needed (319), votedBy (BBWAA), category (Player), are given within the website itself
+induced will have to be manually calculated, explained within question 5.
+
+Now for the final submission, the final dataset needs to include at miniimum, Candidate name, year, votes, percent of vote, whether the candidate was induced. Therefore, we will want to keep %vote within the table.
+
+### Question 4: 
+
+The variables that should be numeric would be yearID, votes, ballots, and %vote. The ones that are already contained within the data that would need to be updated would be Votes and percent_vote.
+
+```{r}
+# Updating Votes and percent_vote variable types
+data$Votes <- as.numeric(data$Votes)
+
+#To get the percentage without the % sign, I will use parse_number
+library(readr)
+data$percent_vote <- readr::parse_number(data$`%vote`)
+```
+
+### Question 5:
+
+In order to identify who was inducted, this can be done two different ways. This could be done using %vote and comparing that number to 319/425 threshold, which is 75.0588235%, or by manually calculating if they reached threshold by looking at the number of votes they got and comparing to what was needed (319). For simplicity, I will just be checking to ensure that the number of votes is greater than 319.
+
+```{r}
+#Creating a new column for inducted here.
+
+data$inducted <- ifelse(data$Votes >= 319, "Y", "N")
+```
+
+### Additionally:
+
+Additionally I have chosen to get rid of the X- infront of some of the players within the updated data set.
+
+```{r}
+data$Name <- gsub("X-", "", data$Name)
+```
+
+### Final data cleaning:
+
+```{r}
+library(dplyr)
+
+final_hof_2026 <- data |>
+  select(Name, Votes, percent_vote, inducted) |>
+  mutate(yearID = 2026,
+         ballots = 425,
+         needed = 319,
+         votedBy = "BBWAA",
+         category = "Player")
+
+head(final_hof_2026)
+```
+
+## Comparing Data Sets
+
+Now, I will compare the data sets to see if the inducted people I got is the same as the already existing HallOfFame dataset.
+
+```{r}
+lahman_2026 <- HallOfFame |>
+  filter(yearID == 2026)
+
+final_hof_2026 |>
+  count(inducted)
+
+lahman_2026 |>
+  count(votedBy, inducted)
+```
+
+Now, by looking at the actual data set, it appears that the only people who appear within the 2026 year of the data, are ones that were votedBy the "Contemporary Baseball Era", which likely means that the BBWAA has not been included within the dataset yet. Therefore the inducted counts do not match currently.
+
+## Combining the data sets
+
+Since we now have an updated portion of the 2026 year data, from BBWAA, we could combine these data sets together to create a more accurate/updated version of the HallOfFame data. One issue that presents is that our data includes Name, while the official HallOfFame dataset includes playerID, so, we would need to locate the playerIDs of all of the players in order to properly combine the datasets together.
+
+## Exporting the data set
+
+```{r}
+readr::write_csv(final_hof_2026, file="SamaraHacker_HallOfFame_2026.csv")
+```
+
