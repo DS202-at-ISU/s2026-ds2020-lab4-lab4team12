@@ -9,7 +9,7 @@
 <meta http-equiv="X-UA-Compatible" content="IE=EDGE" />
 
 
-<meta name="author" content="Samara Feldhacker" />
+<meta name="author" content="Tanisha Magikar" />
 
 
 <title>Progress Report</title>
@@ -350,187 +350,450 @@ display: none;
 
 
 <h1 class="title toc-ignore">Progress Report</h1>
-<h4 class="author">Samara Feldhacker</h4>
+<h4 class="author">Tanisha Magikar</h4>
 <h4 class="date">2026-4-29</h4>
 
 </div>
 
 
-<div id="progress-report-samara-feldhacker" class="section level1">
-<h1>Progress Report: Samara Feldhacker</h1>
-<div id="scrape-the-data" class="section level2">
-<h2>Scrape the data</h2>
-<p>I followed the steps outlined within the lab slides and the lecture
-slides for the lecture covering data scraping. I also utilized these
-functions for my data set within the Final project, so I am very
-familiar with them.</p>
-<pre class="r"><code>library(rvest)
-url &lt;- &quot;https://www.baseball-reference.com/awards/hof_2026.shtml&quot;
-html &lt;- read_html(url)
-tables &lt;- html_table(html)
+<div id="lab-4-scraping-hall-of-fame-2026-data" class="section level2">
+<h2>Lab 4: Scraping Hall of Fame 2026 Data</h2>
+<div id="goal" class="section level3">
+<h3>Goal</h3>
+<p>The goal of this report is to scrape the 2026 Baseball Hall of Fame
+voting data from Baseball Reference, clean the data into a usable
+format, save the cleaned data as a CSV file, and compare the results to
+the <code>HallOfFame</code> table in the <code>Lahman</code>
+package.</p>
+<p>The final cleaned dataset should include:</p>
+<ul>
+<li>candidate name</li>
+<li>year</li>
+<li>votes</li>
+<li>percent of vote</li>
+<li>whether the candidate was inducted</li>
+</ul>
+</div>
+<div id="scrape-the-baseball-reference-data" class="section level3">
+<h3>Scrape the Baseball Reference data</h3>
+<p>For this part, I used <code>rvest</code> to read the Hall of Fame
+voting page and collect the tables from the webpage.</p>
+<pre class="r"><code>hof_url &lt;- &quot;https://www.baseball-reference.com/awards/hof_2026.shtml&quot;
 
-data &lt;- tables[[1]]
-actual_col_names &lt;- data[1,]
-colnames(data) &lt;- actual_col_names
-data &lt;- data[-1,]</code></pre>
-<p>Data now contains the data from the hof_2026 webpage.</p>
-</div>
-<div id="clean-the-data" class="section level2">
-<h2>Clean the data</h2>
-<p>What steps are necessary to get the scraped data into a useful
-format?</p>
-<div id="question-1" class="section level3">
-<h3>Question 1:</h3>
-<p>Within scrapping the data step, I did already get the correct table
-that contains the necessary information from the webpage, which is the
-first step to getting the data into a useful format. The first table was
-the baseball writers table, which was for the 2026 Hall of Fame Voting,
-and the second table was the veterans committee, which is not needed.
-Therefore the first table is the needed one.</p>
-<pre class="r"><code># Code from above that applies to this step
+hof_page &lt;- read_html(hof_url)
 
-# data &lt;- tables[[1]]</code></pre>
-</div>
-<div id="question-2" class="section level3">
-<h3>Question 2:</h3>
-<p>I also completed this step within scrapping the data step. Within the
-table, the first row already contains the correct column names for the
-column. Therefore, I set the actual_col_names to be this first row of
-names, and then I updated the data column names to match these and
-update the dataset to exclude the first column row. This ensures that
-the variable names for the columns is incorrect.</p>
-<pre class="r"><code># Code from above that applies to this step
+hof_tables &lt;- hof_page |&gt;
+  html_table(fill = TRUE)
 
-# actual_col_names &lt;- data[1,]
-# colnames(data) &lt;- actual_col_names
-# data &lt;- data[-1,]</code></pre>
+length(hof_tables)</code></pre>
+<pre><code>## [1] 2</code></pre>
 </div>
-<div id="question-3" class="section level3">
-<h3>Question 3:</h3>
-<p>Now, when determining which columns I want to keep, I will compare to
-the actual HallOfFame dataset</p>
-<pre class="r"><code>library(Lahman)
-head(HallOfFame, 3)</code></pre>
-<pre><code>##    playerID yearID votedBy ballots needed votes inducted category needed_note
-## 1 aaronha01   1982   BBWAA     415    312   406        Y   Player        &lt;NA&gt;
-## 2 abbotji01   2005   BBWAA     516    387    13        N   Player        &lt;NA&gt;
-## 3 abreubo01   2020   BBWAA     397    298    22        N   Player        &lt;NA&gt;</code></pre>
-<p>As shown above, the variables within the HallOfFame dataset are
-playerID, yearID, votedBy, ballots, needed, votes, induced, category,
-and needed_note.</p>
-<p>Now within the data, the variables that are the most similar / match,
-are Name (similar ish to playerID) and Votes (votes) yearID (2026),
-ballots (425), needed (319), votedBy (BBWAA), category (Player), are
-given within the website itself induced will have to be manually
-calculated, explained within question 5.</p>
-<p>Now for the final submission, the final dataset needs to include at
-miniimum, Candidate name, year, votes, percent of vote, whether the
-candidate was induced. Therefore, we will want to keep %vote within the
-table.</p>
-</div>
-<div id="question-4" class="section level3">
-<h3>Question 4:</h3>
-<p>The variables that should be numeric would be yearID, votes, ballots,
-and %vote. The ones that are already contained within the data that
-would need to be updated would be Votes and percent_vote.</p>
-<pre class="r"><code># Updating Votes and percent_vote variable types
-data$Votes &lt;- as.numeric(data$Votes)
+<div id="select-the-correct-table" class="section level3">
+<h3>Select the correct table</h3>
+<p>The page contains more than one table. The table I need is the BBWAA
+voting table, which is the first and largest table on the page.</p>
+<pre class="r"><code>table_summary &lt;- tibble(
+  table_number = seq_along(hof_tables),
+  number_of_rows = map_int(hof_tables, nrow),
+  number_of_columns = map_int(hof_tables, ncol)
+)
 
-#To get the percentage without the % sign, I will use parse_number
-library(readr)</code></pre>
-<pre><code>## 
-## Attaching package: &#39;readr&#39;</code></pre>
-<pre><code>## The following object is masked from &#39;package:rvest&#39;:
-## 
-##     guess_encoding</code></pre>
-<pre class="r"><code>data$percent_vote &lt;- readr::parse_number(data$`%vote`)</code></pre>
-</div>
-<div id="question-5" class="section level3">
-<h3>Question 5:</h3>
-<p>In order to identify who was inducted, this can be done two different
-ways. This could be done using %vote and comparing that number to
-319/425 threshold, which is 75.0588235%, or by manually calculating if
-they reached threshold by looking at the number of votes they got and
-comparing to what was needed (319). For simplicity, I will just be
-checking to ensure that the number of votes is greater than 319.</p>
-<pre class="r"><code>#Creating a new column for inducted here.
+table_summary</code></pre>
+<pre><code>## # A tibble: 2 × 3
+##   table_number number_of_rows number_of_columns
+##          &lt;int&gt;          &lt;int&gt;             &lt;int&gt;
+## 1            1             28                39
+## 2            2              2                40</code></pre>
+<pre class="r"><code>hof_raw &lt;- hof_tables[[1]]
 
-data$inducted &lt;- ifelse(data$Votes &gt;= 319, &quot;Y&quot;, &quot;N&quot;)</code></pre>
+glimpse(hof_raw)</code></pre>
+<pre><code>## Rows: 28
+## Columns: 39
+## $ ``               &lt;chr&gt; &quot;Rk&quot;, &quot;1&quot;, &quot;2&quot;, &quot;3&quot;, &quot;4&quot;, &quot;5&quot;, &quot;6&quot;, &quot;7&quot;, &quot;8&quot;, &quot;9&quot;, &quot;1…
+## $ ``               &lt;chr&gt; &quot;Name&quot;, &quot;Carlos Beltrán&quot;, &quot;Andruw Jones&quot;, &quot;Chase Utle…
+## $ ``               &lt;chr&gt; &quot;YoB&quot;, &quot;4th&quot;, &quot;9th&quot;, &quot;3rd&quot;, &quot;8th&quot;, &quot;2nd&quot;, &quot;5th&quot;, &quot;10t…
+## $ ``               &lt;chr&gt; &quot;Votes&quot;, &quot;358&quot;, &quot;333&quot;, &quot;251&quot;, &quot;206&quot;, &quot;196&quot;, &quot;170&quot;, &quot;1…
+## $ ``               &lt;chr&gt; &quot;%vote&quot;, &quot;84.2%&quot;, &quot;78.4%&quot;, &quot;59.1%&quot;, &quot;48.5%&quot;, &quot;46.1%&quot;,…
+## $ ``               &lt;chr&gt; &quot;HOFm&quot;, &quot;126&quot;, &quot;109&quot;, &quot;94&quot;, &quot;128&quot;, &quot;67&quot;, &quot;390&quot;, &quot;226&quot;…
+## $ ``               &lt;chr&gt; &quot;HOFs&quot;, &quot;50&quot;, &quot;32&quot;, &quot;36&quot;, &quot;44&quot;, &quot;31&quot;, &quot;77&quot;, &quot;68&quot;, &quot;52…
+## $ ``               &lt;chr&gt; &quot;Yrs&quot;, &quot;20&quot;, &quot;17&quot;, &quot;16&quot;, &quot;18&quot;, &quot;15&quot;, &quot;22&quot;, &quot;19&quot;, &quot;18&quot;…
+## $ ``               &lt;chr&gt; &quot;WAR&quot;, &quot;70.0&quot;, &quot;62.7&quot;, &quot;64.6&quot;, &quot;60.2&quot;, &quot;49.8&quot;, &quot;117.4…
+## $ ``               &lt;chr&gt; &quot;WAR7&quot;, &quot;44.4&quot;, &quot;46.4&quot;, &quot;49.3&quot;, &quot;34.1&quot;, &quot;38.5&quot;, &quot;64.3…
+## $ ``               &lt;chr&gt; &quot;JAWS&quot;, &quot;57.2&quot;, &quot;54.6&quot;, &quot;56.9&quot;, &quot;47.2&quot;, &quot;44.1&quot;, &quot;90.9…
+## $ ``               &lt;chr&gt; &quot;Jpos&quot;, &quot;58.0&quot;, &quot;58.0&quot;, &quot;56.6&quot;, &quot;61.4&quot;, &quot;61.4&quot;, &quot;55.5…
+## $ `Batting Stats`  &lt;chr&gt; &quot;G&quot;, &quot;2586&quot;, &quot;2196&quot;, &quot;1937&quot;, &quot;108&quot;, &quot;22&quot;, &quot;2784&quot;, &quot;23…
+## $ `Batting Stats`  &lt;chr&gt; &quot;AB&quot;, &quot;9768&quot;, &quot;7599&quot;, &quot;6857&quot;, &quot;196&quot;, &quot;50&quot;, &quot;10566&quot;, &quot;…
+## $ `Batting Stats`  &lt;chr&gt; &quot;R&quot;, &quot;1582&quot;, &quot;1204&quot;, &quot;1103&quot;, &quot;6&quot;, &quot;3&quot;, &quot;2021&quot;, &quot;1544&quot;…
+## $ `Batting Stats`  &lt;chr&gt; &quot;H&quot;, &quot;2725&quot;, &quot;1933&quot;, &quot;1885&quot;, &quot;27&quot;, &quot;4&quot;, &quot;3115&quot;, &quot;2574…
+## $ `Batting Stats`  &lt;chr&gt; &quot;HR&quot;, &quot;435&quot;, &quot;434&quot;, &quot;259&quot;, &quot;1&quot;, &quot;1&quot;, &quot;696&quot;, &quot;555&quot;, &quot;2…
+## $ `Batting Stats`  &lt;chr&gt; &quot;RBI&quot;, &quot;1587&quot;, &quot;1289&quot;, &quot;1025&quot;, &quot;13&quot;, &quot;7&quot;, &quot;2086&quot;, &quot;18…
+## $ `Batting Stats`  &lt;chr&gt; &quot;SB&quot;, &quot;312&quot;, &quot;152&quot;, &quot;154&quot;, &quot;0&quot;, &quot;0&quot;, &quot;329&quot;, &quot;38&quot;, &quot;40…
+## $ `Batting Stats`  &lt;chr&gt; &quot;BB&quot;, &quot;1084&quot;, &quot;891&quot;, &quot;724&quot;, &quot;6&quot;, &quot;2&quot;, &quot;1338&quot;, &quot;1329&quot;,…
+## $ `Batting Stats`  &lt;chr&gt; &quot;BA&quot;, &quot;.279&quot;, &quot;.254&quot;, &quot;.275&quot;, &quot;.138&quot;, &quot;.080&quot;, &quot;.295&quot;,…
+## $ `Batting Stats`  &lt;chr&gt; &quot;OBP&quot;, &quot;.350&quot;, &quot;.337&quot;, &quot;.358&quot;, &quot;.163&quot;, &quot;.115&quot;, &quot;.380&quot;…
+## $ `Batting Stats`  &lt;chr&gt; &quot;SLG&quot;, &quot;.486&quot;, &quot;.486&quot;, &quot;.465&quot;, &quot;.184&quot;, &quot;.160&quot;, &quot;.550&quot;…
+## $ `Batting Stats`  &lt;chr&gt; &quot;OPS&quot;, &quot;.837&quot;, &quot;.823&quot;, &quot;.823&quot;, &quot;.346&quot;, &quot;.275&quot;, &quot;.930&quot;…
+## $ `Batting Stats`  &lt;chr&gt; &quot;OPS+&quot;, &quot;119&quot;, &quot;111&quot;, &quot;117&quot;, &quot;-10&quot;, &quot;-24&quot;, &quot;140&quot;, &quot;15…
+## $ `Pitching Stats` &lt;chr&gt; &quot;W&quot;, &quot;&quot;, &quot;&quot;, &quot;&quot;, &quot;256&quot;, &quot;169&quot;, &quot;&quot;, &quot;&quot;, &quot;&quot;, &quot;&quot;, &quot;163&quot;,…
+## $ `Pitching Stats` &lt;chr&gt; &quot;L&quot;, &quot;&quot;, &quot;&quot;, &quot;&quot;, &quot;153&quot;, &quot;136&quot;, &quot;&quot;, &quot;&quot;, &quot;&quot;, &quot;&quot;, &quot;122&quot;,…
+## $ `Pitching Stats` &lt;chr&gt; &quot;ERA&quot;, &quot;&quot;, &quot;&quot;, &quot;&quot;, &quot;3.85&quot;, &quot;3.42&quot;, &quot;&quot;, &quot;&quot;, &quot;&quot;, &quot;&quot;, &quot;3…
+## $ `Pitching Stats` &lt;chr&gt; &quot;ERA+&quot;, &quot;&quot;, &quot;&quot;, &quot;&quot;, &quot;117&quot;, &quot;117&quot;, &quot;&quot;, &quot;&quot;, &quot;&quot;, &quot;&quot;, &quot;12…
+## $ `Pitching Stats` &lt;chr&gt; &quot;WHIP&quot;, &quot;&quot;, &quot;&quot;, &quot;&quot;, &quot;1.351&quot;, &quot;1.206&quot;, &quot;&quot;, &quot;&quot;, &quot;&quot;, &quot;&quot;,…
+## $ `Pitching Stats` &lt;chr&gt; &quot;G&quot;, &quot;&quot;, &quot;&quot;, &quot;&quot;, &quot;531&quot;, &quot;419&quot;, &quot;&quot;, &quot;&quot;, &quot;&quot;, &quot;&quot;, &quot;423&quot;,…
+## $ `Pitching Stats` &lt;chr&gt; &quot;GS&quot;, &quot;&quot;, &quot;&quot;, &quot;&quot;, &quot;521&quot;, &quot;418&quot;, &quot;&quot;, &quot;&quot;, &quot;&quot;, &quot;&quot;, &quot;422&quot;…
+## $ `Pitching Stats` &lt;chr&gt; &quot;SV&quot;, &quot;&quot;, &quot;&quot;, &quot;&quot;, &quot;0&quot;, &quot;0&quot;, &quot;&quot;, &quot;&quot;, &quot;&quot;, &quot;&quot;, &quot;0&quot;, &quot;&quot;, …
+## $ `Pitching Stats` &lt;chr&gt; &quot;IP&quot;, &quot;&quot;, &quot;&quot;, &quot;&quot;, &quot;3316.0&quot;, &quot;2729.2&quot;, &quot;&quot;, &quot;&quot;, &quot;&quot;, &quot;&quot;,…
+## $ `Pitching Stats` &lt;chr&gt; &quot;H&quot;, &quot;&quot;, &quot;&quot;, &quot;&quot;, &quot;3448&quot;, &quot;2487&quot;, &quot;&quot;, &quot;&quot;, &quot;&quot;, &quot;&quot;, &quot;242…
+## $ `Pitching Stats` &lt;chr&gt; &quot;HR&quot;, &quot;&quot;, &quot;&quot;, &quot;&quot;, &quot;288&quot;, &quot;264&quot;, &quot;&quot;, &quot;&quot;, &quot;&quot;, &quot;&quot;, &quot;310&quot;…
+## $ `Pitching Stats` &lt;chr&gt; &quot;BB&quot;, &quot;&quot;, &quot;&quot;, &quot;&quot;, &quot;1031&quot;, &quot;805&quot;, &quot;&quot;, &quot;&quot;, &quot;&quot;, &quot;&quot;, &quot;767…
+## $ `Pitching Stats` &lt;chr&gt; &quot;SO&quot;, &quot;&quot;, &quot;&quot;, &quot;&quot;, &quot;2448&quot;, &quot;2524&quot;, &quot;&quot;, &quot;&quot;, &quot;&quot;, &quot;&quot;, &quot;25…
+## $ ``               &lt;chr&gt; &quot;Pos Summary&quot;, &quot;*8*9*DH/73&quot;, &quot;*89H7D/3&quot;, &quot;*4H3/D5&quot;, &quot;…</code></pre>
+<pre class="r"><code>head(hof_raw)</code></pre>
+<pre><code>## # A tibble: 6 × 39
+##   ``    ``           ``    ``    ``    ``    ``    ``    ``    ``    ``    ``   
+##   &lt;chr&gt; &lt;chr&gt;        &lt;chr&gt; &lt;chr&gt; &lt;chr&gt; &lt;chr&gt; &lt;chr&gt; &lt;chr&gt; &lt;chr&gt; &lt;chr&gt; &lt;chr&gt; &lt;chr&gt;
+## 1 Rk    Name         YoB   Votes %vote HOFm  HOFs  Yrs   WAR   WAR7  JAWS  Jpos 
+## 2 1     Carlos Belt… 4th   358   84.2% 126   50    20    70.0  44.4  57.2  58.0 
+## 3 2     Andruw Jones 9th   333   78.4% 109   32    17    62.7  46.4  54.6  58.0 
+## 4 3     Chase Utley  3rd   251   59.1% 94    36    16    64.6  49.3  56.9  56.6 
+## 5 4     Andy Pettit… 8th   206   48.5% 128   44    18    60.2  34.1  47.2  61.4 
+## 6 5     Félix Herná… 2nd   196   46.1% 67    31    15    49.8  38.5  44.1  61.4 
+## # ℹ 27 more variables: `Batting Stats` &lt;chr&gt;, `Batting Stats` &lt;chr&gt;,
+## #   `Batting Stats` &lt;chr&gt;, `Batting Stats` &lt;chr&gt;, `Batting Stats` &lt;chr&gt;,
+## #   `Batting Stats` &lt;chr&gt;, `Batting Stats` &lt;chr&gt;, `Batting Stats` &lt;chr&gt;,
+## #   `Batting Stats` &lt;chr&gt;, `Batting Stats` &lt;chr&gt;, `Batting Stats` &lt;chr&gt;,
+## #   `Batting Stats` &lt;chr&gt;, `Batting Stats` &lt;chr&gt;, `Pitching Stats` &lt;chr&gt;,
+## #   `Pitching Stats` &lt;chr&gt;, `Pitching Stats` &lt;chr&gt;, `Pitching Stats` &lt;chr&gt;,
+## #   `Pitching Stats` &lt;chr&gt;, `Pitching Stats` &lt;chr&gt;, `Pitching Stats` &lt;chr&gt;, …</code></pre>
 </div>
-<div id="additionally" class="section level3">
-<h3>Additionally:</h3>
-<p>Additionally I have chosen to get rid of the X- infront of some of
-the players within the updated data set.</p>
-<pre class="r"><code>data$Name &lt;- gsub(&quot;X-&quot;, &quot;&quot;, data$Name)</code></pre>
-</div>
-<div id="final-data-cleaning" class="section level3">
-<h3>Final data cleaning:</h3>
-<pre class="r"><code>library(dplyr)</code></pre>
-<pre><code>## 
-## Attaching package: &#39;dplyr&#39;</code></pre>
-<pre><code>## The following objects are masked from &#39;package:stats&#39;:
-## 
-##     filter, lag</code></pre>
-<pre><code>## The following objects are masked from &#39;package:base&#39;:
-## 
-##     intersect, setdiff, setequal, union</code></pre>
-<pre class="r"><code>final_hof_2026 &lt;- data |&gt;
-  select(Name, Votes, percent_vote, inducted) |&gt;
-  mutate(yearID = 2026,
-         ballots = 425,
-         needed = 319,
-         votedBy = &quot;BBWAA&quot;,
-         category = &quot;Player&quot;)
+<div id="clean-the-column-names" class="section level3">
+<h3>Clean the column names</h3>
+<p>The scraped table does not immediately come in with perfect column
+names. The first row contains the useful column names, so I use that row
+as the actual header and then remove it from the data.</p>
+<pre class="r"><code>new_column_names &lt;- hof_raw[1, ] |&gt;
+  unlist(use.names = FALSE) |&gt;
+  as.character()
 
-head(final_hof_2026)</code></pre>
-<pre><code>## # A tibble: 6 × 9
-##   Name        Votes percent_vote inducted yearID ballots needed votedBy category
-##   &lt;chr&gt;       &lt;dbl&gt;        &lt;dbl&gt; &lt;chr&gt;     &lt;dbl&gt;   &lt;dbl&gt;  &lt;dbl&gt; &lt;chr&gt;   &lt;chr&gt;   
-## 1 Carlos Bel…   358         84.2 Y          2026     425    319 BBWAA   Player  
-## 2 Andruw Jon…   333         78.4 Y          2026     425    319 BBWAA   Player  
-## 3 Chase Utley   251         59.1 N          2026     425    319 BBWAA   Player  
-## 4 Andy Petti…   206         48.5 N          2026     425    319 BBWAA   Player  
-## 5 Félix Hern…   196         46.1 N          2026     425    319 BBWAA   Player  
-## 6 Alex Rodri…   170         40   N          2026     425    319 BBWAA   Player</code></pre>
+new_column_names &lt;- ifelse(
+  new_column_names == &quot;&quot; | is.na(new_column_names),
+  paste0(&quot;extra_col_&quot;, seq_along(new_column_names)),
+  new_column_names
+)
+
+new_column_names &lt;- make.unique(new_column_names)
+
+hof_clean_names &lt;- hof_raw[-1, ]
+
+names(hof_clean_names) &lt;- new_column_names
+
+glimpse(hof_clean_names)</code></pre>
+<pre><code>## Rows: 27
+## Columns: 39
+## $ Rk            &lt;chr&gt; &quot;1&quot;, &quot;2&quot;, &quot;3&quot;, &quot;4&quot;, &quot;5&quot;, &quot;6&quot;, &quot;7&quot;, &quot;8&quot;, &quot;9&quot;, &quot;10&quot;, &quot;11&quot;,…
+## $ Name          &lt;chr&gt; &quot;Carlos Beltrán&quot;, &quot;Andruw Jones&quot;, &quot;Chase Utley&quot;, &quot;Andy P…
+## $ YoB           &lt;chr&gt; &quot;4th&quot;, &quot;9th&quot;, &quot;3rd&quot;, &quot;8th&quot;, &quot;2nd&quot;, &quot;5th&quot;, &quot;10th&quot;, &quot;7th&quot;,…
+## $ Votes         &lt;chr&gt; &quot;358&quot;, &quot;333&quot;, &quot;251&quot;, &quot;206&quot;, &quot;196&quot;, &quot;170&quot;, &quot;165&quot;, &quot;131&quot;, …
+## $ `%vote`       &lt;chr&gt; &quot;84.2%&quot;, &quot;78.4%&quot;, &quot;59.1%&quot;, &quot;48.5%&quot;, &quot;46.1%&quot;, &quot;40.0%&quot;, &quot;3…
+## $ HOFm          &lt;chr&gt; &quot;126&quot;, &quot;109&quot;, &quot;94&quot;, &quot;128&quot;, &quot;67&quot;, &quot;390&quot;, &quot;226&quot;, &quot;95&quot;, &quot;12…
+## $ HOFs          &lt;chr&gt; &quot;50&quot;, &quot;32&quot;, &quot;36&quot;, &quot;44&quot;, &quot;31&quot;, &quot;77&quot;, &quot;68&quot;, &quot;52&quot;, &quot;42&quot;, &quot;3…
+## $ Yrs           &lt;chr&gt; &quot;20&quot;, &quot;17&quot;, &quot;16&quot;, &quot;18&quot;, &quot;15&quot;, &quot;22&quot;, &quot;19&quot;, &quot;18&quot;, &quot;17&quot;, &quot;1…
+## $ WAR           &lt;chr&gt; &quot;70.0&quot;, &quot;62.7&quot;, &quot;64.6&quot;, &quot;60.2&quot;, &quot;49.8&quot;, &quot;117.4&quot;, &quot;69.3&quot;,…
+## $ WAR7          &lt;chr&gt; &quot;44.4&quot;, &quot;46.4&quot;, &quot;49.3&quot;, &quot;34.1&quot;, &quot;38.5&quot;, &quot;64.3&quot;, &quot;40.0&quot;, …
+## $ JAWS          &lt;chr&gt; &quot;57.2&quot;, &quot;54.6&quot;, &quot;56.9&quot;, &quot;47.2&quot;, &quot;44.1&quot;, &quot;90.9&quot;, &quot;54.6&quot;, …
+## $ Jpos          &lt;chr&gt; &quot;58.0&quot;, &quot;58.0&quot;, &quot;56.6&quot;, &quot;61.4&quot;, &quot;61.4&quot;, &quot;55.5&quot;, &quot;53.6&quot;, …
+## $ G             &lt;chr&gt; &quot;2586&quot;, &quot;2196&quot;, &quot;1937&quot;, &quot;108&quot;, &quot;22&quot;, &quot;2784&quot;, &quot;2302&quot;, &quot;24…
+## $ AB            &lt;chr&gt; &quot;9768&quot;, &quot;7599&quot;, &quot;6857&quot;, &quot;196&quot;, &quot;50&quot;, &quot;10566&quot;, &quot;8244&quot;, &quot;8…
+## $ R             &lt;chr&gt; &quot;1582&quot;, &quot;1204&quot;, &quot;1103&quot;, &quot;6&quot;, &quot;3&quot;, &quot;2021&quot;, &quot;1544&quot;, &quot;1453&quot;…
+## $ H             &lt;chr&gt; &quot;2725&quot;, &quot;1933&quot;, &quot;1885&quot;, &quot;27&quot;, &quot;4&quot;, &quot;3115&quot;, &quot;2574&quot;, &quot;2470…
+## $ HR            &lt;chr&gt; &quot;435&quot;, &quot;434&quot;, &quot;259&quot;, &quot;1&quot;, &quot;1&quot;, &quot;696&quot;, &quot;555&quot;, &quot;288&quot;, &quot;231…
+## $ RBI           &lt;chr&gt; &quot;1587&quot;, &quot;1289&quot;, &quot;1025&quot;, &quot;13&quot;, &quot;7&quot;, &quot;2086&quot;, &quot;1831&quot;, &quot;1363…
+## $ SB            &lt;chr&gt; &quot;312&quot;, &quot;152&quot;, &quot;154&quot;, &quot;0&quot;, &quot;0&quot;, &quot;329&quot;, &quot;38&quot;, &quot;400&quot;, &quot;470&quot;…
+## $ BB            &lt;chr&gt; &quot;1084&quot;, &quot;891&quot;, &quot;724&quot;, &quot;6&quot;, &quot;2&quot;, &quot;1338&quot;, &quot;1329&quot;, &quot;1476&quot;, …
+## $ BA            &lt;chr&gt; &quot;.279&quot;, &quot;.254&quot;, &quot;.275&quot;, &quot;.138&quot;, &quot;.080&quot;, &quot;.295&quot;, &quot;.312&quot;, …
+## $ OBP           &lt;chr&gt; &quot;.350&quot;, &quot;.337&quot;, &quot;.358&quot;, &quot;.163&quot;, &quot;.115&quot;, &quot;.380&quot;, &quot;.411&quot;, …
+## $ SLG           &lt;chr&gt; &quot;.486&quot;, &quot;.486&quot;, &quot;.465&quot;, &quot;.184&quot;, &quot;.160&quot;, &quot;.550&quot;, &quot;.585&quot;, …
+## $ OPS           &lt;chr&gt; &quot;.837&quot;, &quot;.823&quot;, &quot;.823&quot;, &quot;.346&quot;, &quot;.275&quot;, &quot;.930&quot;, &quot;.996&quot;, …
+## $ `OPS+`        &lt;chr&gt; &quot;119&quot;, &quot;111&quot;, &quot;117&quot;, &quot;-10&quot;, &quot;-24&quot;, &quot;140&quot;, &quot;154&quot;, &quot;128&quot;, …
+## $ W             &lt;chr&gt; &quot;&quot;, &quot;&quot;, &quot;&quot;, &quot;256&quot;, &quot;169&quot;, &quot;&quot;, &quot;&quot;, &quot;&quot;, &quot;&quot;, &quot;163&quot;, &quot;&quot;, &quot;21…
+## $ L             &lt;chr&gt; &quot;&quot;, &quot;&quot;, &quot;&quot;, &quot;153&quot;, &quot;136&quot;, &quot;&quot;, &quot;&quot;, &quot;&quot;, &quot;&quot;, &quot;122&quot;, &quot;&quot;, &quot;16…
+## $ ERA           &lt;chr&gt; &quot;&quot;, &quot;&quot;, &quot;&quot;, &quot;3.85&quot;, &quot;3.42&quot;, &quot;&quot;, &quot;&quot;, &quot;&quot;, &quot;&quot;, &quot;3.43&quot;, &quot;&quot;, …
+## $ `ERA+`        &lt;chr&gt; &quot;&quot;, &quot;&quot;, &quot;&quot;, &quot;117&quot;, &quot;117&quot;, &quot;&quot;, &quot;&quot;, &quot;&quot;, &quot;&quot;, &quot;123&quot;, &quot;&quot;, &quot;11…
+## $ WHIP          &lt;chr&gt; &quot;&quot;, &quot;&quot;, &quot;&quot;, &quot;1.351&quot;, &quot;1.206&quot;, &quot;&quot;, &quot;&quot;, &quot;&quot;, &quot;&quot;, &quot;1.183&quot;, &quot;…
+## $ G.1           &lt;chr&gt; &quot;&quot;, &quot;&quot;, &quot;&quot;, &quot;531&quot;, &quot;419&quot;, &quot;&quot;, &quot;&quot;, &quot;&quot;, &quot;&quot;, &quot;423&quot;, &quot;&quot;, &quot;51…
+## $ GS            &lt;chr&gt; &quot;&quot;, &quot;&quot;, &quot;&quot;, &quot;521&quot;, &quot;418&quot;, &quot;&quot;, &quot;&quot;, &quot;&quot;, &quot;&quot;, &quot;422&quot;, &quot;&quot;, &quot;49…
+## $ SV            &lt;chr&gt; &quot;&quot;, &quot;&quot;, &quot;&quot;, &quot;0&quot;, &quot;0&quot;, &quot;&quot;, &quot;&quot;, &quot;&quot;, &quot;&quot;, &quot;0&quot;, &quot;&quot;, &quot;0&quot;, &quot;&quot;, …
+## $ IP            &lt;chr&gt; &quot;&quot;, &quot;&quot;, &quot;&quot;, &quot;3316.0&quot;, &quot;2729.2&quot;, &quot;&quot;, &quot;&quot;, &quot;&quot;, &quot;&quot;, &quot;2698.0&quot;…
+## $ H.1           &lt;chr&gt; &quot;&quot;, &quot;&quot;, &quot;&quot;, &quot;3448&quot;, &quot;2487&quot;, &quot;&quot;, &quot;&quot;, &quot;&quot;, &quot;&quot;, &quot;2424&quot;, &quot;&quot;, …
+## $ HR.1          &lt;chr&gt; &quot;&quot;, &quot;&quot;, &quot;&quot;, &quot;288&quot;, &quot;264&quot;, &quot;&quot;, &quot;&quot;, &quot;&quot;, &quot;&quot;, &quot;310&quot;, &quot;&quot;, &quot;36…
+## $ BB.1          &lt;chr&gt; &quot;&quot;, &quot;&quot;, &quot;&quot;, &quot;1031&quot;, &quot;805&quot;, &quot;&quot;, &quot;&quot;, &quot;&quot;, &quot;&quot;, &quot;767&quot;, &quot;&quot;, &quot;7…
+## $ SO            &lt;chr&gt; &quot;&quot;, &quot;&quot;, &quot;&quot;, &quot;2448&quot;, &quot;2524&quot;, &quot;&quot;, &quot;&quot;, &quot;&quot;, &quot;&quot;, &quot;2560&quot;, &quot;&quot;, …
+## $ `Pos Summary` &lt;chr&gt; &quot;*8*9*DH/73&quot;, &quot;*89H7D/3&quot;, &quot;*4H3/D5&quot;, &quot;*1/H&quot;, &quot;*1&quot;, &quot;*6*5…</code></pre>
+<pre class="r"><code>head(hof_clean_names)</code></pre>
+<pre><code>## # A tibble: 6 × 39
+##   Rk    Name       YoB   Votes `%vote` HOFm  HOFs  Yrs   WAR   WAR7  JAWS  Jpos 
+##   &lt;chr&gt; &lt;chr&gt;      &lt;chr&gt; &lt;chr&gt; &lt;chr&gt;   &lt;chr&gt; &lt;chr&gt; &lt;chr&gt; &lt;chr&gt; &lt;chr&gt; &lt;chr&gt; &lt;chr&gt;
+## 1 1     Carlos Be… 4th   358   84.2%   126   50    20    70.0  44.4  57.2  58.0 
+## 2 2     Andruw Jo… 9th   333   78.4%   109   32    17    62.7  46.4  54.6  58.0 
+## 3 3     Chase Utl… 3rd   251   59.1%   94    36    16    64.6  49.3  56.9  56.6 
+## 4 4     Andy Pett… 8th   206   48.5%   128   44    18    60.2  34.1  47.2  61.4 
+## 5 5     Félix Her… 2nd   196   46.1%   67    31    15    49.8  38.5  44.1  61.4 
+## 6 6     Alex Rodr… 5th   170   40.0%   390   77    22    117.4 64.3  90.9  55.5 
+## # ℹ 27 more variables: G &lt;chr&gt;, AB &lt;chr&gt;, R &lt;chr&gt;, H &lt;chr&gt;, HR &lt;chr&gt;,
+## #   RBI &lt;chr&gt;, SB &lt;chr&gt;, BB &lt;chr&gt;, BA &lt;chr&gt;, OBP &lt;chr&gt;, SLG &lt;chr&gt;, OPS &lt;chr&gt;,
+## #   `OPS+` &lt;chr&gt;, W &lt;chr&gt;, L &lt;chr&gt;, ERA &lt;chr&gt;, `ERA+` &lt;chr&gt;, WHIP &lt;chr&gt;,
+## #   G.1 &lt;chr&gt;, GS &lt;chr&gt;, SV &lt;chr&gt;, IP &lt;chr&gt;, H.1 &lt;chr&gt;, HR.1 &lt;chr&gt;, BB.1 &lt;chr&gt;,
+## #   SO &lt;chr&gt;, `Pos Summary` &lt;chr&gt;</code></pre>
 </div>
+<div id="clean-the-data" class="section level3">
+<h3>Clean the data</h3>
+<p>The final dataset needs the candidate name, year, votes, percent of
+vote, and whether the candidate was inducted.</p>
+<p>I also added a few extra columns that make the data easier to compare
+to Lahman: ballots, needed, votedBy, and category.</p>
+<pre class="r"><code>year_of_vote &lt;- 2026
+total_ballots &lt;- 425
+votes_needed &lt;- ceiling(total_ballots * 0.75)
+
+hof_2026_clean &lt;- hof_clean_names |&gt;
+  transmute(
+    candidate = Name,
+    yearID = year_of_vote,
+    votes = parse_number(Votes),
+    percent_vote = parse_number(`%vote`),
+    ballots = total_ballots,
+    needed = votes_needed,
+    votedBy = &quot;BBWAA&quot;,
+    category = &quot;Player&quot;
+  ) |&gt;
+  mutate(
+    candidate = candidate |&gt;
+      str_remove(&quot;^X-&quot;) |&gt;
+      str_remove(&quot;\\*$&quot;) |&gt;
+      str_squish(),
+    inducted = if_else(votes &gt;= needed, &quot;Y&quot;, &quot;N&quot;)
+  ) |&gt;
+  filter(
+    !is.na(candidate),
+    candidate != &quot;&quot;,
+    candidate != &quot;Name&quot;,
+    !is.na(votes),
+    !is.na(percent_vote)
+  ) |&gt;
+  arrange(desc(percent_vote))
+
+hof_2026_clean</code></pre>
+<pre><code>## # A tibble: 27 × 9
+##    candidate  yearID votes percent_vote ballots needed votedBy category inducted
+##    &lt;chr&gt;       &lt;dbl&gt; &lt;dbl&gt;        &lt;dbl&gt;   &lt;dbl&gt;  &lt;dbl&gt; &lt;chr&gt;   &lt;chr&gt;    &lt;chr&gt;   
+##  1 Carlos Be…   2026   358         84.2     425    319 BBWAA   Player   Y       
+##  2 Andruw Jo…   2026   333         78.4     425    319 BBWAA   Player   Y       
+##  3 Chase Utl…   2026   251         59.1     425    319 BBWAA   Player   N       
+##  4 Andy Pett…   2026   206         48.5     425    319 BBWAA   Player   N       
+##  5 Félix Her…   2026   196         46.1     425    319 BBWAA   Player   N       
+##  6 Alex Rodr…   2026   170         40       425    319 BBWAA   Player   N       
+##  7 Manny Ram…   2026   165         38.8     425    319 BBWAA   Player   N       
+##  8 Bobby Abr…   2026   131         30.8     425    319 BBWAA   Player   N       
+##  9 Jimmy Rol…   2026   108         25.4     425    319 BBWAA   Player   N       
+## 10 Cole Hame…   2026   101         23.8     425    319 BBWAA   Player   N       
+## # ℹ 17 more rows</code></pre>
 </div>
-<div id="comparing-data-sets" class="section level2">
-<h2>Comparing Data Sets</h2>
-<p>Now, I will compare the data sets to see if the inducted people I got
-is the same as the already existing HallOfFame dataset.</p>
-<pre class="r"><code>lahman_2026 &lt;- HallOfFame |&gt;
+<div id="check-who-was-inducted" class="section level3">
+<h3>Check who was inducted</h3>
+<p>A player needed at least 319 votes out of 425 ballots to be
+inducted.</p>
+<pre class="r"><code>hof_2026_clean |&gt;
+  filter(inducted == &quot;Y&quot;)</code></pre>
+<pre><code>## # A tibble: 2 × 9
+##   candidate   yearID votes percent_vote ballots needed votedBy category inducted
+##   &lt;chr&gt;        &lt;dbl&gt; &lt;dbl&gt;        &lt;dbl&gt;   &lt;dbl&gt;  &lt;dbl&gt; &lt;chr&gt;   &lt;chr&gt;    &lt;chr&gt;   
+## 1 Carlos Bel…   2026   358         84.2     425    319 BBWAA   Player   Y       
+## 2 Andruw Jon…   2026   333         78.4     425    319 BBWAA   Player   Y</code></pre>
+</div>
+<div id="save-the-cleaned-dataset" class="section level3">
+<h3>Save the cleaned dataset</h3>
+<pre class="r"><code>final_hof_2026 &lt;- hof_2026_clean |&gt;
+  select(candidate, yearID, votes, percent_vote, inducted, ballots, needed, votedBy, category)
+
+write_csv(final_hof_2026, &quot;TanishaMagikar_HallOfFame_2026.csv&quot;)
+
+final_hof_2026</code></pre>
+<pre><code>## # A tibble: 27 × 9
+##    candidate  yearID votes percent_vote inducted ballots needed votedBy category
+##    &lt;chr&gt;       &lt;dbl&gt; &lt;dbl&gt;        &lt;dbl&gt; &lt;chr&gt;      &lt;dbl&gt;  &lt;dbl&gt; &lt;chr&gt;   &lt;chr&gt;   
+##  1 Carlos Be…   2026   358         84.2 Y            425    319 BBWAA   Player  
+##  2 Andruw Jo…   2026   333         78.4 Y            425    319 BBWAA   Player  
+##  3 Chase Utl…   2026   251         59.1 N            425    319 BBWAA   Player  
+##  4 Andy Pett…   2026   206         48.5 N            425    319 BBWAA   Player  
+##  5 Félix Her…   2026   196         46.1 N            425    319 BBWAA   Player  
+##  6 Alex Rodr…   2026   170         40   N            425    319 BBWAA   Player  
+##  7 Manny Ram…   2026   165         38.8 N            425    319 BBWAA   Player  
+##  8 Bobby Abr…   2026   131         30.8 N            425    319 BBWAA   Player  
+##  9 Jimmy Rol…   2026   108         25.4 N            425    319 BBWAA   Player  
+## 10 Cole Hame…   2026   101         23.8 N            425    319 BBWAA   Player  
+## # ℹ 17 more rows</code></pre>
+</div>
+<div id="compare-to-lahman" class="section level3">
+<h3>Compare to Lahman</h3>
+<p>Next, I compared my scraped Baseball Reference data to the 2026
+records in Lahman’s <code>HallOfFame</code> table.</p>
+<pre class="r"><code>lahman_2026 &lt;- Lahman::HallOfFame |&gt;
   filter(yearID == 2026)
 
-final_hof_2026 |&gt;
-  count(inducted)</code></pre>
-<pre><code>## # A tibble: 2 × 2
-##   inducted     n
-##   &lt;chr&gt;    &lt;int&gt;
-## 1 N           25
-## 2 Y            2</code></pre>
+lahman_2026</code></pre>
+<pre><code>##    playerID yearID                   votedBy ballots needed votes inducted
+## 1 bondsba01   2026 Contemporary Baseball Era      16     12    NA        N
+## 2 clemero02   2026 Contemporary Baseball Era      16     12    NA        N
+## 3 delgaca01   2026 Contemporary Baseball Era      16     12     9        N
+## 4  kentje01   2026 Contemporary Baseball Era      16     12    14        Y
+## 5 mattido01   2026 Contemporary Baseball Era      16     12     6        N
+## 6 murphda05   2026 Contemporary Baseball Era      16     12     6        N
+## 7 sheffga01   2026 Contemporary Baseball Era      16     12    NA        N
+## 8 valenfe01   2026 Contemporary Baseball Era      16     12    NA        N
+##   category needed_note
+## 1   Player    &lt;5 votes
+## 2   Player    &lt;5 votes
+## 3   Player        &lt;NA&gt;
+## 4   Player        &lt;NA&gt;
+## 5   Player        &lt;NA&gt;
+## 6   Player        &lt;NA&gt;
+## 7   Player    &lt;5 votes
+## 8   Player    &lt;5 votes</code></pre>
+</div>
+<div id="compare-inducted-counts" class="section level3">
+<h3>Compare inducted counts</h3>
+<pre class="r"><code>final_hof_2026 |&gt;
+  count(votedBy, inducted)</code></pre>
+<pre><code>## # A tibble: 2 × 3
+##   votedBy inducted     n
+##   &lt;chr&gt;   &lt;chr&gt;    &lt;int&gt;
+## 1 BBWAA   N           25
+## 2 BBWAA   Y            2</code></pre>
 <pre class="r"><code>lahman_2026 |&gt;
   count(votedBy, inducted)</code></pre>
 <pre><code>##                     votedBy inducted n
 ## 1 Contemporary Baseball Era        N 7
 ## 2 Contemporary Baseball Era        Y 1</code></pre>
-<p>Now, by looking at the actual data set, it appears that the only
-people who appear within the 2026 year of the data, are ones that were
-votedBy the “Contemporary Baseball Era”, which likely means that the
-BBWAA has not been included within the dataset yet. Therefore the
-inducted counts do not match currently.</p>
 </div>
-<div id="combining-the-data-sets" class="section level2">
-<h2>Combining the data sets</h2>
-<p>Since we now have an updated portion of the 2026 year data, from
-BBWAA, we could combine these data sets together to create a more
-accurate/updated version of the HallOfFame data. One issue that presents
-is that our data includes Name, while the official HallOfFame dataset
-includes playerID, so, we would need to locate the playerIDs of all of
-the players in order to properly combine the datasets together.</p>
+<div id="create-name-keys-for-comparison" class="section level3">
+<h3>Create name keys for comparison</h3>
+<p>The Baseball Reference data uses candidate names, while Lahman uses
+<code>playerID</code>. To make comparison easier, I created a simple
+name key from the Lahman <code>People</code> table.</p>
+<pre class="r"><code>make_name_key &lt;- function(x) {
+  x |&gt;
+    str_to_lower() |&gt;
+    str_replace_all(&quot;[^a-z ]&quot;, &quot; &quot;) |&gt;
+    str_squish()
+}
+
+lahman_names &lt;- Lahman::People |&gt;
+  transmute(
+    playerID,
+    lahman_name = str_squish(paste(nameFirst, nameLast)),
+    name_key = make_name_key(lahman_name)
+  )
+
+scraped_for_compare &lt;- final_hof_2026 |&gt;
+  mutate(name_key = make_name_key(candidate))
+
+lahman_for_compare &lt;- lahman_2026 |&gt;
+  left_join(lahman_names, by = &quot;playerID&quot;) |&gt;
+  mutate(
+    name_key = make_name_key(lahman_name),
+    lahman_inducted = inducted
+  ) |&gt;
+  select(
+    playerID,
+    lahman_name,
+    name_key,
+    yearID,
+    votedBy,
+    ballots,
+    needed,
+    lahman_votes = votes,
+    lahman_inducted,
+    category,
+    needed_note
+  )</code></pre>
 </div>
-<div id="exporting-the-data-set" class="section level2">
-<h2>Exporting the data set</h2>
-<pre class="r"><code>readr::write_csv(final_hof_2026, file=&quot;SamaraHacker_HallOfFame_2026.csv&quot;)</code></pre>
+<div id="full-comparison" class="section level3">
+<h3>Full comparison</h3>
+<pre class="r"><code>comparison_2026 &lt;- full_join(
+  scraped_for_compare,
+  lahman_for_compare,
+  by = c(&quot;name_key&quot;, &quot;yearID&quot;),
+  suffix = c(&quot;_scraped&quot;, &quot;_lahman&quot;)
+) |&gt;
+  mutate(
+    comparison_name = coalesce(candidate, lahman_name),
+    source = case_when(
+      !is.na(candidate) &amp; !is.na(lahman_name) ~ &quot;appears in both&quot;,
+      !is.na(candidate) &amp; is.na(lahman_name) ~ &quot;Baseball Reference only&quot;,
+      is.na(candidate) &amp; !is.na(lahman_name) ~ &quot;Lahman only&quot;,
+      TRUE ~ &quot;check&quot;
+    )
+  ) |&gt;
+  select(
+    comparison_name,
+    yearID,
+    source,
+    votes,
+    percent_vote,
+    inducted,
+    lahman_votes,
+    lahman_inducted,
+    votedBy_lahman,
+    needed_note
+  ) |&gt;
+  arrange(source, desc(percent_vote), comparison_name)
+
+comparison_2026</code></pre>
+<pre><code>## # A tibble: 35 × 10
+##    comparison_name yearID source        votes percent_vote inducted lahman_votes
+##    &lt;chr&gt;            &lt;dbl&gt; &lt;chr&gt;         &lt;dbl&gt;        &lt;dbl&gt; &lt;chr&gt;           &lt;dbl&gt;
+##  1 Carlos Beltrán    2026 Baseball Ref…   358         84.2 Y                  NA
+##  2 Andruw Jones      2026 Baseball Ref…   333         78.4 Y                  NA
+##  3 Chase Utley       2026 Baseball Ref…   251         59.1 N                  NA
+##  4 Andy Pettitte     2026 Baseball Ref…   206         48.5 N                  NA
+##  5 Félix Hernández   2026 Baseball Ref…   196         46.1 N                  NA
+##  6 Alex Rodriguez    2026 Baseball Ref…   170         40   N                  NA
+##  7 Manny Ramirez     2026 Baseball Ref…   165         38.8 N                  NA
+##  8 Bobby Abreu       2026 Baseball Ref…   131         30.8 N                  NA
+##  9 Jimmy Rollins     2026 Baseball Ref…   108         25.4 N                  NA
+## 10 Cole Hamels       2026 Baseball Ref…   101         23.8 N                  NA
+## # ℹ 25 more rows
+## # ℹ 3 more variables: lahman_inducted &lt;fct&gt;, votedBy_lahman &lt;chr&gt;,
+## #   needed_note &lt;chr&gt;</code></pre>
+</div>
+<div id="exporting-the-data-set" class="section level3">
+<h3>Exporting the data set</h3>
+<pre class="r"><code>final_hof_2026 &lt;- hof_2026_clean |&gt;
+  select(candidate, yearID, votes, percent_vote, inducted, ballots, needed, votedBy, category)
+
+readr::write_csv(final_hof_2026, file = &quot;TanishaMagikar_HallOfFame_2026.csv&quot;)
+getwd()</code></pre>
+<pre><code>## [1] &quot;/Users/tmagikar/Desktop/Lab 4/s2026-ds2020-lab4-lab4team12&quot;</code></pre>
+<pre class="r"><code>file.exists(&quot;TanishaMagikar_HallOfFame_2026.csv&quot;)</code></pre>
+<pre><code>## [1] TRUE</code></pre>
+<pre class="r"><code>list.files(pattern = &quot;\\.csv$&quot;)</code></pre>
+<pre><code>## [1] &quot;SamaraHacker_HallOfFame_2026.csv&quot;   &quot;TanishaMagikar_HallOfFame_2026.csv&quot;</code></pre>
+</div>
+<div id="notes" class="section level3">
+<h3>Notes</h3>
+<p>The Baseball Reference table needed cleaning because the first row
+contained the actual column names. After fixing the column names, I kept
+the variables needed for the final dataset: candidate name, year, votes,
+percent of vote, and inducted status.</p>
+<p>I calculated <code>inducted</code> by checking whether the candidate
+had at least 319 votes. This was the number needed because there were
+425 total ballots and a player needed at least 75 percent of the
+vote.</p>
+<p>The Baseball Reference data and Lahman data do not match row-for-row.
+Baseball Reference shows the BBWAA ballot for 2026, while the Lahman
+<code>HallOfFame</code> table may include other voting groups, such as
+the Contemporary Baseball Era committee. Because of that, differences
+between the two sources are expected.</p>
 </div>
 </div>
 

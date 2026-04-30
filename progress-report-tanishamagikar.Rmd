@@ -1,0 +1,270 @@
+---
+title: "Progress Report"
+author: "Tanisha Magikar"
+date: "2026-4-29"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, message = FALSE, warning = FALSE)
+
+library(tidyverse)
+library(rvest)
+library(Lahman)
+library(readr)
+```
+
+## Lab 4: Scraping Hall of Fame 2026 Data
+
+### Goal
+
+The goal of this report is to scrape the 2026 Baseball Hall of Fame voting data from Baseball Reference, clean the data into a usable format, save the cleaned data as a CSV file, and compare the results to the `HallOfFame` table in the `Lahman` package.
+
+The final cleaned dataset should include:
+
+- candidate name
+- year
+- votes
+- percent of vote
+- whether the candidate was inducted
+
+### Scrape the Baseball Reference data
+
+For this part, I used `rvest` to read the Hall of Fame voting page and collect the tables from the webpage.
+
+```{r scrape-data}
+hof_url <- "https://www.baseball-reference.com/awards/hof_2026.shtml"
+
+hof_page <- read_html(hof_url)
+
+hof_tables <- hof_page |>
+  html_table(fill = TRUE)
+
+length(hof_tables)
+```
+
+### Select the correct table
+
+The page contains more than one table. The table I need is the BBWAA voting table, which is the first and largest table on the page.
+
+```{r select-table}
+table_summary <- tibble(
+  table_number = seq_along(hof_tables),
+  number_of_rows = map_int(hof_tables, nrow),
+  number_of_columns = map_int(hof_tables, ncol)
+)
+
+table_summary
+```
+
+```{r raw-table}
+hof_raw <- hof_tables[[1]]
+
+glimpse(hof_raw)
+head(hof_raw)
+```
+
+### Clean the column names
+
+The scraped table does not immediately come in with perfect column names. The first row contains the useful column names, so I use that row as the actual header and then remove it from the data.
+
+```{r clean-column-names}
+new_column_names <- hof_raw[1, ] |>
+  unlist(use.names = FALSE) |>
+  as.character()
+
+new_column_names <- ifelse(
+  new_column_names == "" | is.na(new_column_names),
+  paste0("extra_col_", seq_along(new_column_names)),
+  new_column_names
+)
+
+new_column_names <- make.unique(new_column_names)
+
+hof_clean_names <- hof_raw[-1, ]
+
+names(hof_clean_names) <- new_column_names
+
+glimpse(hof_clean_names)
+head(hof_clean_names)
+```
+
+### Clean the data
+
+The final dataset needs the candidate name, year, votes, percent of vote, and whether the candidate was inducted.
+
+I also added a few extra columns that make the data easier to compare to Lahman: ballots, needed, votedBy, and category.
+
+```{r clean-data}
+year_of_vote <- 2026
+total_ballots <- 425
+votes_needed <- ceiling(total_ballots * 0.75)
+
+hof_2026_clean <- hof_clean_names |>
+  transmute(
+    candidate = Name,
+    yearID = year_of_vote,
+    votes = parse_number(Votes),
+    percent_vote = parse_number(`%vote`),
+    ballots = total_ballots,
+    needed = votes_needed,
+    votedBy = "BBWAA",
+    category = "Player"
+  ) |>
+  mutate(
+    candidate = candidate |>
+      str_remove("^X-") |>
+      str_remove("\\*$") |>
+      str_squish(),
+    inducted = if_else(votes >= needed, "Y", "N")
+  ) |>
+  filter(
+    !is.na(candidate),
+    candidate != "",
+    candidate != "Name",
+    !is.na(votes),
+    !is.na(percent_vote)
+  ) |>
+  arrange(desc(percent_vote))
+
+hof_2026_clean
+```
+
+### Check who was inducted
+
+A player needed at least 319 votes out of 425 ballots to be inducted.
+
+```{r inducted-players}
+hof_2026_clean |>
+  filter(inducted == "Y")
+```
+
+### Save the cleaned dataset
+
+```{r save-data}
+final_hof_2026 <- hof_2026_clean |>
+  select(candidate, yearID, votes, percent_vote, inducted, ballots, needed, votedBy, category)
+
+write_csv(final_hof_2026, "TanishaMagikar_HallOfFame_2026.csv")
+
+final_hof_2026
+```
+
+### Compare to Lahman
+
+Next, I compared my scraped Baseball Reference data to the 2026 records in Lahman's `HallOfFame` table.
+
+```{r lahman-2026}
+lahman_2026 <- Lahman::HallOfFame |>
+  filter(yearID == 2026)
+
+lahman_2026
+```
+
+### Compare inducted counts
+
+```{r compare-counts}
+final_hof_2026 |>
+  count(votedBy, inducted)
+
+lahman_2026 |>
+  count(votedBy, inducted)
+```
+
+### Create name keys for comparison
+
+The Baseball Reference data uses candidate names, while Lahman uses `playerID`. To make comparison easier, I created a simple name key from the Lahman `People` table.
+
+```{r name-keys}
+make_name_key <- function(x) {
+  x |>
+    str_to_lower() |>
+    str_replace_all("[^a-z ]", " ") |>
+    str_squish()
+}
+
+lahman_names <- Lahman::People |>
+  transmute(
+    playerID,
+    lahman_name = str_squish(paste(nameFirst, nameLast)),
+    name_key = make_name_key(lahman_name)
+  )
+
+scraped_for_compare <- final_hof_2026 |>
+  mutate(name_key = make_name_key(candidate))
+
+lahman_for_compare <- lahman_2026 |>
+  left_join(lahman_names, by = "playerID") |>
+  mutate(
+    name_key = make_name_key(lahman_name),
+    lahman_inducted = inducted
+  ) |>
+  select(
+    playerID,
+    lahman_name,
+    name_key,
+    yearID,
+    votedBy,
+    ballots,
+    needed,
+    lahman_votes = votes,
+    lahman_inducted,
+    category,
+    needed_note
+  )
+```
+
+### Full comparison
+
+```{r full-comparison}
+comparison_2026 <- full_join(
+  scraped_for_compare,
+  lahman_for_compare,
+  by = c("name_key", "yearID"),
+  suffix = c("_scraped", "_lahman")
+) |>
+  mutate(
+    comparison_name = coalesce(candidate, lahman_name),
+    source = case_when(
+      !is.na(candidate) & !is.na(lahman_name) ~ "appears in both",
+      !is.na(candidate) & is.na(lahman_name) ~ "Baseball Reference only",
+      is.na(candidate) & !is.na(lahman_name) ~ "Lahman only",
+      TRUE ~ "check"
+    )
+  ) |>
+  select(
+    comparison_name,
+    yearID,
+    source,
+    votes,
+    percent_vote,
+    inducted,
+    lahman_votes,
+    lahman_inducted,
+    votedBy_lahman,
+    needed_note
+  ) |>
+  arrange(source, desc(percent_vote), comparison_name)
+
+comparison_2026
+```
+
+### Exporting the data set
+
+```{r export-data}
+final_hof_2026 <- hof_2026_clean |>
+  select(candidate, yearID, votes, percent_vote, inducted, ballots, needed, votedBy, category)
+
+readr::write_csv(final_hof_2026, file = "TanishaMagikar_HallOfFame_2026.csv")
+getwd()
+file.exists("TanishaMagikar_HallOfFame_2026.csv")
+list.files(pattern = "\\.csv$")
+```
+
+### Notes
+
+The Baseball Reference table needed cleaning because the first row contained the actual column names. After fixing the column names, I kept the variables needed for the final dataset: candidate name, year, votes, percent of vote, and inducted status.
+
+I calculated `inducted` by checking whether the candidate had at least 319 votes. This was the number needed because there were 425 total ballots and a player needed at least 75 percent of the vote.
+
+The Baseball Reference data and Lahman data do not match row-for-row. Baseball Reference shows the BBWAA ballot for 2026, while the Lahman `HallOfFame` table may include other voting groups, such as the Contemporary Baseball Era committee. Because of that, differences between the two sources are expected.
