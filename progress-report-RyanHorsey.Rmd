@@ -1,0 +1,139 @@
+---
+title: "Progress Report"
+author: "Ryan Horsey"
+date: "2026-04-30"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+# Progress Report: Ryan Horsey
+
+## Scrape the Data
+
+I used the `rvest` package to read the 2026 Hall of Fame voting table from Baseball Reference.
+The raw table has no proper column names. They are stored in the first row of data, so I
+extract them and overwrite the column names, then remove that first row.
+
+```{r}
+library(rvest)
+
+url <- "https://www.baseball-reference.com/awards/hof_2026.shtml"
+html <- read_html(url)
+tables <- html_table(html)
+
+data <- tables[[1]]
+
+# The true column names are stored in row 1
+actual_col_names <- data[1, ]
+colnames(data) <- actual_col_names
+data <- data[-1, ]
+```
+
+## Clean the Data
+
+### Question 1 — Which table?
+
+`tables[[1]]` is the BBWAA ballot table for 2026, which is what we need.
+`tables[[2]]` would be the Veterans/Contemporary Era committee (we can ignore that).
+
+### Question 2 — Are variable names correct?
+
+Yes, after the fix above the column names match the header row shown on the website
+(e.g. `Name`, `Votes`, `%vote`, `YoB`, etc.).
+
+### Question 3 — Which columns to keep?
+
+The lab requires at minimum: candidate name, year, votes, percent of vote, and
+whether the candidate was inducted. I'll compare to the `Lahman::HallOfFame` structure
+to make sure I'm aligned:
+
+```{r}
+library(Lahman)
+head(HallOfFame, 3)
+```
+
+I'll keep `Name`, `Votes`, and `%vote` from the scraped data, then construct
+`yearID`, `inducted`, and `percent_vote` myself.
+
+### Question 4 — Which variables should be numeric?
+
+`Votes` comes in as character and needs to be converted. `%vote` has a `%` sign so I
+use `parse_number()` from `readr` to strip it.
+
+```{r}
+library(readr)
+
+data$Votes <- as.numeric(data$Votes)
+data$percent_vote <- readr::parse_number(data$`%vote`)
+```
+
+### Question 5 — Who was inducted?
+
+The induction threshold is 75% of ballots cast. Using `percent_vote >= 75` is the
+cleanest approach because some players have suppressed vote totals (shown as NA),
+and checking votes directly against a raw number would leave those rows with a
+missing `inducted` value instead of `"N"`.
+
+```{r}
+data$inducted <- ifelse(data$percent_vote >= 75, "Y", "N")
+```
+
+### Remove "X-" prefix
+
+Some player names are prefixed with `"X-"` on Baseball Reference to indicate they
+were dropped from future ballots. We clean that off so names are readable.
+
+```{r}
+data$Name <- gsub("X-", "", data$Name)
+```
+
+### Final cleaned dataset
+
+```{r}
+library(dplyr)
+
+hof_2026 <- data |>
+  select(Name, Votes, percent_vote, inducted) |>
+  mutate(
+    yearID   = 2026,
+    votedBy  = "BBWAA",
+    category = "Player"
+  )
+
+head(hof_2026)
+```
+
+## Compare to Lahman
+
+```{r}
+lahman_2026 <- HallOfFame |>
+  filter(yearID == 2026)
+
+# How many rows in each source?
+nrow(hof_2026)
+nrow(lahman_2026)
+
+# Inducted counts
+hof_2026 |> count(inducted)
+lahman_2026 |> count(votedBy, inducted)
+```
+
+The scraped BBWAA table has many more rows than the Lahman 2026 data. That's expected:
+the Lahman `HallOfFame` table currently only contains the **Contemporary Baseball Era**
+committee results for 2026 (8 rows), not the full BBWAA ballot. The two sources are
+organized differently, so an exact row-for-row match is not expected.
+
+The players inducted according to the BBWAA ballot (percent_vote >= 75):
+
+```{r}
+hof_2026 |> filter(inducted == "Y") |> select(Name, Votes, percent_vote)
+```
+
+## Export the Dataset
+
+```{r}
+readr::write_csv(hof_2026, file = "HallOfFame_2026.csv")
+```
