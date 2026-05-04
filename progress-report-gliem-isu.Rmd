@@ -1,0 +1,68 @@
+---
+title: "progress-report-gliem-isu"
+author: "Mason Gliege"
+date: "2026-05-01"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+
+#loading libraries
+```{r}
+library(tidyverse)
+library(rvest)
+library(Lahman)
+```
+
+#scraping
+```{r}
+url <- "https://www.baseball-reference.com/awards/hof_2026.shtml"
+html <- read_html(url)
+tables <- html_table(html)
+#first data table is the correct one
+rawData <- tables[[1]]
+rawData
+```
+
+
+#cleaning
+```{r}
+#overrite colnames with first row, remove the first row as well
+colnames(rawData) <- rawData[1,]
+data <- rawData[-1,]
+
+#clean data and add appropriate columns
+hof2026 <- data |> select(Name, Votes, `%vote`) |> mutate(
+  #remove X-
+  candidate = gsub("X-", "", Name),
+  yearID = 2026,
+  votes = as.numeric(Votes),
+  percentVote = readr::parse_number(`%vote`),
+  #add variables
+  ballots = 425,
+  needed = 319,
+  votedBy = "BBWAA",
+  category = "player",
+  #determine if they are inducted based on the threshold of 319 votes
+  inducted = ifelse(votes >= needed, "Y","N")
+) |> select(candidate, yearID, votes, percentVote, inducted, ballots, needed,votedBy, category) |> filter(candidate != "Name" & !is.na(candidate))
+
+head(hof2026)
+```
+
+
+#compare to the Lahman package
+``` {r}
+#filtering for 2026
+lahman2026 <- HallOfFame |> filter(yearID == 2026)
+#counting how many were inducted:
+print("Scraped inducted count:")
+hof2026 |> count(inducted)
+print("Lahman inducted count:")
+hof2026 |> count(votedBy, inducted)
+
+
+```
